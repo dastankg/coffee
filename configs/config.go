@@ -31,8 +31,8 @@ func LoadConfig() *Config {
 			DATABASE_URL: os.Getenv("DATABASE_URL"),
 		},
 		Auth: AuthConfig{
-			AccessSecret:  os.Getenv("JWT_ACCESS_SECRET"),
-			RefreshSecret: os.Getenv("JWT_REFRESH_SECRET"),
+			AccessSecret:  os.Getenv("TOKEN"),
+			RefreshSecret: os.Getenv("TOKEN"),
 		},
 	}
 }
