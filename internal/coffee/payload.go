@@ -12,3 +12,12 @@ type CoffeeCreateRequest struct {
 	Image       *multipart.Form `json:"image" validate:"required"`
 	FlagIcon    *multipart.Form `json:"flag_icon" validate:"required"`
 }
+
+type CoffeeGetAllResponse struct {
+	Coffee []Coffee `json:"coffee"`
+	Count  int64    `json:"count"`
+}
+
+type CoffeeDeleteResponse struct {
+	Message string `json:"message"`
+}

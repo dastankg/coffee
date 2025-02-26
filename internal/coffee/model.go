@@ -1,11 +1,11 @@
 package coffee
 
-import (
-	"gorm.io/gorm"
-)
+import "time"
 
 type Coffee struct {
-	gorm.Model
+	ID          uint `gorm:"primaryKey"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 	Name        string  `json:"name" example:"Espresso" gorm:"size:50;not null"`
 	Slug        string  `json:"slug" example:"espresso" gorm:"size:50;unique;index;not null"`
 	Price       float64 `json:"price" example:"4.99" gorm:"type:decimal(20,2);not null"`

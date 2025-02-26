@@ -2,8 +2,10 @@ package coffee
 
 import (
 	"coffee/configs"
+	"coffee/pkg/middleware"
 	"coffee/pkg/res"
 	"net/http"
+	"strconv"
 )
 
 type CoffeeHandler struct {
@@ -19,7 +21,9 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 	handler := &CoffeeHandler{
 		CoffeeRepository: deps.CoffeeRepository,
 	}
-	router.HandleFunc("POST /coffee/create", handler.CreateCoffee())
+	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
+	router.HandleFunc("POST /coffee/coffees", handler.GetAllCoffee())
+	router.Handle("POST /coffee/delete/{id}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
 }
 
 const (
@@ -30,9 +34,11 @@ const (
 // CreateCoffee ... Create Coffee
 // @Summary Create Coffee
 // @Description Create coffee
-// @Tags Coffee CRUD
-// @Accept json
+// @Tags Coffee
+// @Accept multipart/form-data
 // @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer токен авторизации" default(Bearer <token>)
 // @Param name formData string true "Название кофе"
 // @Param slug formData string true "URL-friendly идентификатор"
 // @Param price formData number true "Цена кофе"
@@ -42,7 +48,8 @@ const (
 // @Param image formData file true "Изображение кофе"
 // @Param flagIcon formData file true "Иконка флага страны происхождения"
 // @Success 201 {object} Coffee
-// @Router /coffee/create [post]  // <-- Изменили путь здесь
+// @Failure 401 {string} string "Unauthorized"
+// @Router /coffee/create [post]
 func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseMultipartForm(maxFileSize); err != nil {
@@ -90,5 +97,75 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 		}
 
 		res.Json(w, createdCoffee, http.StatusCreated)
+	}
+}
+
+// @Summary Получение списка кофе
+// @Description Возвращает список кофе с пагинацией
+// @Tags Coffee
+// @Accept json
+// @Produce json
+// @Param limit query int true "Количество записей на странице"
+// @Param offset query int true "Смещение от начала списка"
+// @Success 200 {object} CoffeeGetAllResponse "Список кофе и общее количество"
+// @Failure 400 {string} string "Неверные параметры пагинации"
+// @Router /coffee/coffees [get]
+func (handler *CoffeeHandler) GetAllCoffee() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+		if err != nil {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		}
+		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+		if err != nil {
+			http.Error(w, "invalid offset", http.StatusBadRequest)
+			return
+		}
+		coffees := handler.CoffeeRepository.GetAllCoffee(limit, offset)
+		count := handler.CoffeeRepository.Count()
+		resultat := CoffeeGetAllResponse{
+			Coffee: coffees,
+			Count:  count,
+		}
+		res.Json(w, resultat, http.StatusOK)
+
+	}
+}
+
+// DeleteCoffee ... Удаление кофе
+// @Summary Удаление кофе
+// @Description Удаляет кофе по указанному ID
+// @Tags Coffee
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer токен авторизации" default(Bearer <token>)
+// @Param id path int true "ID кофе"
+// @Success 200 {object} nil "Успешное удаление"
+// @Failure 400 {string} string "Неверный ID"
+// @Failure 401 {string} string "Unauthorized"
+// @Router /coffee/delete/{id} [post]
+func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idString := r.PathValue("id")
+		id, err := strconv.ParseUint(idString, 10, 32)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+		_, err = handler.CoffeeRepository.GetById(uint(id))
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+		}
+		err = handler.CoffeeRepository.Delete(uint(id))
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
+		res.Json(w, CoffeeDeleteResponse{
+			Message: "Товар удален",
+		}, http.StatusOK)
 	}
 }
