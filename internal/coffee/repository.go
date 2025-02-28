@@ -1,6 +1,9 @@
 package coffee
 
-import "coffee/pkg/db"
+import (
+	"coffee/pkg/db"
+	"gorm.io/gorm/clause"
+)
 
 type CoffeeRepository struct {
 	Database *db.Db
@@ -22,7 +25,7 @@ func (repo *CoffeeRepository) CreateCoffee(coffee *Coffee) (*Coffee, error) {
 
 func (repo *CoffeeRepository) GetAllCoffee(limit, offset int) []Coffee {
 	var coffees []Coffee
-	repo.Database.Table("coffees").Where("deleted_at is null").Limit(limit).Offset(offset).Scan(&coffees)
+	repo.Database.Table("coffees").Limit(limit).Offset(offset).Scan(&coffees)
 	return coffees
 }
 
@@ -50,4 +53,12 @@ func (repo *CoffeeRepository) GetById(id uint) (*Coffee, error) {
 		return nil, result.Error
 	}
 	return &coffee, nil
+}
+
+func (repo *CoffeeRepository) Update(coffee *Coffee) (*Coffee, error) {
+	result := repo.Database.DB.Clauses(clause.OnConflict{}).Updates(coffee)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return coffee, nil
 }

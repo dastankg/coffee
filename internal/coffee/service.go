@@ -62,3 +62,14 @@ func (handler *CoffeeHandler) saveFile(r *http.Request, fieldName string) (strin
 
 	return filename, nil
 }
+
+func (handler *CoffeeHandler) deleteFile(path string) error {
+	if path == "" {
+		return nil
+	}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+
+	return os.Remove(path)
+}

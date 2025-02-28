@@ -15,5 +15,8 @@ func main() {
 		Addr:    ":8081",
 		Handler: app,
 	}
-	server.ListenAndServe()
+	err := server.ListenAndServe()
+	if err != nil {
+		return
+	}
 }

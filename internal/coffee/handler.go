@@ -5,6 +5,7 @@ import (
 	"coffee/pkg/middleware"
 	"coffee/pkg/res"
 	"net/http"
+	"path/filepath"
 	"strconv"
 )
 
@@ -22,13 +23,14 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 		CoffeeRepository: deps.CoffeeRepository,
 	}
 	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
-	router.HandleFunc("POST /coffee/coffees", handler.GetAllCoffee())
+	router.HandleFunc("GET /coffee/coffees", handler.GetAllCoffee())
 	router.Handle("POST /coffee/delete/{id}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
+	router.Handle("PUT /coffee/update/{id}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
 }
 
 const (
-	maxFileSize = 10 << 20  // 10 MB
-	uploadDir   = "uploads" // директория для загрузки файлов
+	maxFileSize = 10 << 20 // 10 MB
+	uploadDir   = "uploads"
 )
 
 // CreateCoffee ... Create Coffee
@@ -57,7 +59,6 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			return
 		}
 
-		// Загрузка и сохранение изображений
 		imagePath, err := handler.saveFile(r, "image")
 		if err != nil {
 			http.Error(w, "Ошибка при сохранении изображения: "+err.Error(), http.StatusBadRequest)
@@ -70,14 +71,12 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			return
 		}
 
-		// Парсинг числовых значений
 		price, dollar, ruble, err := handler.parseNumericValues(r)
 		if err != nil {
 			http.Error(w, "Ошибка в числовых значениях: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Создание объекта кофе
 		coffee := NewCoffee(
 			r.FormValue("name"),
 			r.FormValue("slug"),
@@ -89,7 +88,6 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			flagIconPath,
 		)
 
-		// Сохранение в базу данных
 		createdCoffee, err := handler.CoffeeRepository.CreateCoffee(coffee)
 		if err != nil {
 			http.Error(w, "Ошибка при создании записи: "+err.Error(), http.StatusInternalServerError)
@@ -167,5 +165,108 @@ func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
 		res.Json(w, CoffeeDeleteResponse{
 			Message: "Товар удален",
 		}, http.StatusOK)
+	}
+}
+
+// Update ... Обновление информации о кофе
+// @Summary Обновление кофе
+// @Description Обновляет информацию о кофе по указанному ID-
+// @Tags Coffee
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer токен авторизации" default(Bearer <token>)
+// @Param id path int true "ID кофе"
+// @Param name formData string false "Название кофе"
+// @Param slug formData string false "URL-friendly идентификатор"
+// @Param price formData number false "Цена кофе"
+// @Param description formData string false "Описание кофе"
+// @Param dollar formData number false "Цена в долларах"
+// @Param ruble formData number false "Цена в рублях"
+// @Param image formData file false "Изображение кофе"
+// @Param flagIcon formData file false "Иконка флага страны происхождения"
+// @Success 200 {object} Coffee "Обновленная информация о кофе"
+// @Failure 400 {string} string "Ошибка в запросе или неверный ID"
+// @Failure 401 {string} string "Unauthorized"
+// @Router /coffee/update/{id} [put]
+func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idString := r.PathValue("id")
+		id, err := strconv.ParseUint(idString, 10, 32)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
+		existingCoffee, err := handler.CoffeeRepository.GetById(uint(id))
+		if err != nil {
+			http.Error(w, "coffee not found", http.StatusBadRequest)
+			return
+		}
+
+		if err := r.ParseMultipartForm(maxFileSize); err != nil {
+			http.Error(w, "Ошибка при обработке формы: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		name := r.FormValue("name")
+		if name == "" {
+			name = existingCoffee.Name
+		}
+
+		slug := r.FormValue("slug")
+		if slug == "" {
+			slug = existingCoffee.Slug
+		}
+
+		description := r.FormValue("description")
+		if description == "" {
+			description = existingCoffee.Description
+		}
+
+		price, dollar, ruble, err := handler.parseNumericValues(r)
+		if err != nil {
+			price = existingCoffee.Price
+			dollar = existingCoffee.Dollar
+			ruble = existingCoffee.Ruble
+		}
+
+		imagePath := existingCoffee.Image
+		if _, fileHeader, _ := r.FormFile("image"); fileHeader != nil {
+			newImagePath, err := handler.saveFile(r, "image")
+			if err == nil {
+				_ = handler.deleteFile(filepath.Join(uploadDir, filepath.Base(imagePath)))
+				imagePath = newImagePath
+			}
+		}
+
+		flagIconPath := existingCoffee.FlagIcon
+		if _, fileHeader, _ := r.FormFile("flagIcon"); fileHeader != nil {
+			newFlagIconPath, err := handler.saveFile(r, "flagIcon")
+			if err == nil {
+				_ = handler.deleteFile(filepath.Join(uploadDir, filepath.Base(flagIconPath)))
+
+				flagIconPath = newFlagIconPath
+			}
+		}
+
+		updatedCoffee, err := handler.CoffeeRepository.Update(&Coffee{
+			ID:          uint(id),
+			Name:        name,
+			Slug:        slug,
+			Price:       price,
+			Description: description,
+			Dollar:      dollar,
+			Ruble:       ruble,
+			Image:       imagePath,
+			FlagIcon:    flagIconPath,
+		})
+
+		if err != nil {
+			http.Error(w, "failed to update coffee: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		res.Json(w, updatedCoffee, http.StatusOK)
 	}
 }
