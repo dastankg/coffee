@@ -24,6 +24,7 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 	}
 	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
 	router.HandleFunc("GET /coffee/coffees", handler.GetAllCoffee())
+	router.HandleFunc("GET /coffee/coffee/{id}", handler.GetCoffee())
 	router.Handle("POST /coffee/delete/{id}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
 	router.Handle("PUT /coffee/update/{id}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
 }
@@ -268,5 +269,34 @@ func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 		}
 
 		res.Json(w, updatedCoffee, http.StatusOK)
+	}
+}
+
+// @Summary Получение кофе
+// @Description Возвращает кофе
+// @Tags Coffee
+// @Accept json
+// @Produce json
+// @Param id path int true "ID кофе"
+// @Success 200 {object} CoffeeGetResponse "кофе"
+// @Failure 400 {string} string "Неверные параметры"
+// @Router /coffee/coffee/{id} [get]
+func (handler *CoffeeHandler) GetCoffee() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idString := r.PathValue("id")
+		id, err := strconv.ParseUint(idString, 10, 32)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+		coffee, err := handler.CoffeeRepository.GetById(uint(id))
+		if err != nil {
+			http.Error(w, "coffee not found", http.StatusNotFound)
+			return
+		}
+		result := CoffeeGetResponse{
+			Coffee: *coffee,
+		}
+		res.Json(w, result, http.StatusOK)
 	}
 }

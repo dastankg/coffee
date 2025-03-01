@@ -17,7 +17,9 @@ type CoffeeGetAllResponse struct {
 	Coffee []Coffee `json:"coffee"`
 	Count  int64    `json:"count"`
 }
-
+type CoffeeGetResponse struct {
+	Coffee Coffee `json:"coffee"`
+}
 type CoffeeDeleteResponse struct {
 	Message string `json:"message"`
 }
