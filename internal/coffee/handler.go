@@ -4,9 +4,13 @@ import (
 	"coffee/configs"
 	"coffee/pkg/middleware"
 	"coffee/pkg/res"
+	"fmt"
 	"net/http"
+	"os"
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type CoffeeHandler struct {
@@ -25,13 +29,14 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
 	router.HandleFunc("GET /coffee/coffees", handler.GetAllCoffee())
 	router.HandleFunc("GET /coffee/coffee/{id}", handler.GetCoffee())
+	router.HandleFunc("GET /coffee/images/{filename}", handler.GetCoffeeImage())
 	router.Handle("POST /coffee/delete/{id}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
 	router.Handle("PUT /coffee/update/{id}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
 }
 
 const (
 	maxFileSize = 10 << 20 // 10 MB
-	uploadDir   = "uploads"
+	uploadDir   = "static/images"
 )
 
 // CreateCoffee ... Create Coffee
@@ -298,5 +303,30 @@ func (handler *CoffeeHandler) GetCoffee() http.HandlerFunc {
 			Coffee: *coffee,
 		}
 		res.Json(w, result, http.StatusOK)
+	}
+}
+
+func (handler *CoffeeHandler) GetCoffeeImage() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		filename := r.PathValue("filename")
+		fmt.Println(filename)
+		// Путь к директории с изображениями
+		imagePath := path.Join("./images", filename)
+		fmt.Println(imagePath)
+
+		// Проверяем существование файла
+		if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+			http.Error(w, "image not found", http.StatusNotFound)
+			return
+		}
+
+		// Определяем Content-Type на основе расширения файла
+		contentType := "image/jpeg"
+		if strings.HasSuffix(filename, ".png") {
+			contentType = "image/png"
+		}
+
+		w.Header().Set("Content-Type", contentType)
+		http.ServeFile(w, r, imagePath)
 	}
 }
