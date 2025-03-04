@@ -4,13 +4,11 @@ import (
 	"coffee/configs"
 	"coffee/pkg/middleware"
 	"coffee/pkg/res"
-	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 type CoffeeHandler struct {
@@ -29,7 +27,7 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
 	router.HandleFunc("GET /coffee/coffees", handler.GetAllCoffee())
 	router.HandleFunc("GET /coffee/coffee/{id}", handler.GetCoffee())
-	router.HandleFunc("GET /coffee/images/{filename}", handler.GetCoffeeImage())
+	router.HandleFunc("GET /coffee/static/images/{dir}/{filename}", handler.GetCoffeeImage())
 	router.Handle("POST /coffee/delete/{id}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
 	router.Handle("PUT /coffee/update/{id}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
 }
@@ -65,13 +63,13 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			return
 		}
 
-		imagePath, err := handler.saveFile(r, "image")
+		imagePath, err := handler.saveFile(r, "image", uploadDir+"/products")
 		if err != nil {
 			http.Error(w, "Ошибка при сохранении изображения: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		flagIconPath, err := handler.saveFile(r, "flagIcon")
+		flagIconPath, err := handler.saveFile(r, "flagIcon", uploadDir+"/flagsIcon")
 		if err != nil {
 			http.Error(w, "Ошибка при сохранении иконки флага: "+err.Error(), http.StatusBadRequest)
 			return
@@ -239,18 +237,18 @@ func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 
 		imagePath := existingCoffee.Image
 		if _, fileHeader, _ := r.FormFile("image"); fileHeader != nil {
-			newImagePath, err := handler.saveFile(r, "image")
+			newImagePath, err := handler.saveFile(r, "image", uploadDir+"/products")
 			if err == nil {
-				_ = handler.deleteFile(filepath.Join(uploadDir, filepath.Base(imagePath)))
+				_ = handler.deleteFile(filepath.Join(uploadDir+"/products", filepath.Base(imagePath)))
 				imagePath = newImagePath
 			}
 		}
 
 		flagIconPath := existingCoffee.FlagIcon
 		if _, fileHeader, _ := r.FormFile("flagIcon"); fileHeader != nil {
-			newFlagIconPath, err := handler.saveFile(r, "flagIcon")
+			newFlagIconPath, err := handler.saveFile(r, "flagIcon", uploadDir+"/flagsIcon")
 			if err == nil {
-				_ = handler.deleteFile(filepath.Join(uploadDir, filepath.Base(flagIconPath)))
+				_ = handler.deleteFile(filepath.Join(uploadDir+"/flagsIcon", filepath.Base(flagIconPath)))
 
 				flagIconPath = newFlagIconPath
 			}
@@ -309,24 +307,15 @@ func (handler *CoffeeHandler) GetCoffee() http.HandlerFunc {
 func (handler *CoffeeHandler) GetCoffeeImage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		filename := r.PathValue("filename")
-		fmt.Println(filename)
-		// Путь к директории с изображениями
-		imagePath := path.Join("./images", filename)
-		fmt.Println(imagePath)
-
-		// Проверяем существование файла
+		dir := r.PathValue("dir")
+		imagePath := path.Join(uploadDir+"/"+dir, filename)
 		if _, err := os.Stat(imagePath); os.IsNotExist(err) {
 			http.Error(w, "image not found", http.StatusNotFound)
 			return
 		}
-
-		// Определяем Content-Type на основе расширения файла
 		contentType := "image/jpeg"
-		if strings.HasSuffix(filename, ".png") {
-			contentType = "image/png"
-		}
-
 		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Disposition", "inline")
 		http.ServeFile(w, r, imagePath)
 	}
 }

@@ -29,26 +29,22 @@ func (handler *CoffeeHandler) parseNumericValues(r *http.Request) (price, dollar
 	return price, dollar, ruble, nil
 }
 
-func (handler *CoffeeHandler) saveFile(r *http.Request, fieldName string) (string, error) {
+func (handler *CoffeeHandler) saveFile(r *http.Request, fieldName, imagePath string) (string, error) {
 	file, fileHeader, err := r.FormFile(fieldName)
 	if err != nil {
 		return "", fmt.Errorf("ошибка получения файла %s: %w", fieldName, err)
 	}
 	defer file.Close()
 
-	// Создаем директорию, если не существует
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+	if err := os.MkdirAll(imagePath, 0755); err != nil {
 		return "", fmt.Errorf("ошибка создания директории: %w", err)
 	}
 
-	// Получаем расширение исходного файла
 	ext := filepath.Ext(fileHeader.Filename)
 
-	// Генерируем UUID для имени файла
 	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 
-	// Формируем полный путь к файлу
-	fullPath := filepath.Join(uploadDir, filename)
+	fullPath := filepath.Join(imagePath, filename)
 
 	dest, err := os.Create(fullPath)
 	if err != nil {

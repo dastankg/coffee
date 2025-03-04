@@ -33,7 +33,6 @@ func (repo *CoffeeRepository) Count() int64 {
 	var count int64
 	repo.Database.
 		Table("coffees").
-		Where("deleted_at is null").
 		Count(&count)
 	return count
 }
