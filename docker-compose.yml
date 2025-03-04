@@ -1,0 +1,38 @@
+services:
+  coffee-service:
+    container_name: coffee_service
+    build:
+      context: .
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    volumes:
+      - coffee-images:/app/static/images
+    env_file:
+      - .env
+  postgres:
+    container_name: postgres_goland_coffee
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - .pkg/data:/var/lib/postgresql/data
+    env_file:
+      - .env
+
+
+
+volumes:
+  postgres_data:
+  coffee-images:
