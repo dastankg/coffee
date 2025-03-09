@@ -5,6 +5,7 @@ import (
 	_ "coffee/docs"
 	"coffee/internal/auth"
 	"coffee/internal/coffee"
+	"coffee/internal/notification"
 	"coffee/internal/user"
 	"coffee/pkg/db"
 	httpSwagger "github.com/swaggo/http-swagger" // Add this import
@@ -32,7 +33,9 @@ func App() http.Handler {
 		Config:      conf,
 		AuthService: authService,
 	})
-
+	notification.NewNotificationHandler(router, notification.NotificationHandlerDeps{
+		Config: conf,
+	})
 	router.Handle("/docs/", httpSwagger.WrapHandler)
 
 	stack := middleware.Chain(middleware.CORS)

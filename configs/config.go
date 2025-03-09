@@ -9,8 +9,15 @@ import (
 type Config struct {
 	Db   DbConfig
 	Auth AuthConfig
+	Smtp SmtpConfig
 }
 
+type SmtpConfig struct {
+	SmtpHost string
+	SmtpPort string
+	From     string
+	Password string
+}
 type DbConfig struct {
 	DATABASE_URL string
 }
@@ -33,6 +40,12 @@ func LoadConfig() *Config {
 		Auth: AuthConfig{
 			AccessSecret:  os.Getenv("TOKEN"),
 			RefreshSecret: os.Getenv("TOKEN"),
+		},
+		Smtp: SmtpConfig{
+			SmtpHost: os.Getenv("SMTP_HOST"),
+			SmtpPort: os.Getenv("SMTP_PORT"),
+			From:     os.Getenv("SMTP_EMAIL"),
+			Password: os.Getenv("SMTP_PASSWORD"),
 		},
 	}
 }
