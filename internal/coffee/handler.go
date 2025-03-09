@@ -3,6 +3,7 @@ package coffee
 import (
 	"coffee/configs"
 	"coffee/pkg/middleware"
+	"coffee/pkg/qr"
 	"coffee/pkg/res"
 	"net/http"
 	"os"
@@ -26,10 +27,10 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 	}
 	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
 	router.HandleFunc("GET /coffee/coffees", handler.GetAllCoffee())
-	router.HandleFunc("GET /coffee/coffee/{id}", handler.GetCoffee())
+	router.HandleFunc("GET /coffee/coffee/{slug}", handler.GetCoffee())
 	router.HandleFunc("GET /coffee/static/images/{dir}/{filename}", handler.GetCoffeeImage())
-	router.Handle("POST /coffee/delete/{id}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
-	router.Handle("PUT /coffee/update/{id}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
+	router.Handle("POST /coffee/delete/{slug}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
+	router.Handle("PUT /coffee/update/{slug}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
 }
 
 const (
@@ -80,7 +81,12 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			http.Error(w, "Ошибка в числовых значениях: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		qrCode := qr.SimpleQRCode{Content: "http://localhost:8081/coffee/coffee/" + r.FormValue("slug"), Size: 256}
 
+		qrImage, err := qrCode.SaveToFile(uploadDir + "/qr")
+		if err != nil {
+			http.Error(w, "Qr code create error", http.StatusBadRequest)
+		}
 		coffee := NewCoffee(
 			r.FormValue("name"),
 			r.FormValue("slug"),
@@ -90,6 +96,7 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			ruble,
 			imagePath,
 			flagIconPath,
+			qrImage,
 		)
 
 		createdCoffee, err := handler.CoffeeRepository.CreateCoffee(coffee)
@@ -143,24 +150,23 @@ func (handler *CoffeeHandler) GetAllCoffee() http.HandlerFunc {
 // @Produce json
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer токен авторизации" default(Bearer <token>)
-// @Param id path int true "ID кофе"
+// @Param slug path string true "slug кофе"
 // @Success 200 {object} nil "Успешное удаление"
 // @Failure 400 {string} string "Неверный ID"
 // @Failure 401 {string} string "Unauthorized"
-// @Router /coffee/delete/{id} [post]
+// @Router /coffee/delete/{slug} [post]
 func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idString := r.PathValue("id")
-		id, err := strconv.ParseUint(idString, 10, 32)
+		slug := r.PathValue("slug")
+
+		coffee, err := handler.CoffeeRepository.GetBySlug(slug)
+		_ = handler.deleteFile(coffee.Image)
+		_ = handler.deleteFile(coffee.FlagIcon)
+		_ = handler.deleteFile(coffee.QrImage)
 		if err != nil {
 			http.Error(w, "invalid id", http.StatusBadRequest)
-			return
 		}
-		_, err = handler.CoffeeRepository.GetById(uint(id))
-		if err != nil {
-			http.Error(w, "invalid id", http.StatusBadRequest)
-		}
-		err = handler.CoffeeRepository.Delete(uint(id))
+		err = handler.CoffeeRepository.Delete(slug)
 		if err != nil {
 			http.Error(w, "invalid id", http.StatusBadRequest)
 			return
@@ -180,7 +186,7 @@ func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
 // @Produce json
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer токен авторизации" default(Bearer <token>)
-// @Param id path int true "ID кофе"
+// @Param slug path string true "slug кофе"
 // @Param name formData string false "Название кофе"
 // @Param slug formData string false "URL-friendly идентификатор"
 // @Param price formData number false "Цена кофе"
@@ -192,17 +198,11 @@ func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
 // @Success 200 {object} Coffee "Обновленная информация о кофе"
 // @Failure 400 {string} string "Ошибка в запросе или неверный ID"
 // @Failure 401 {string} string "Unauthorized"
-// @Router /coffee/update/{id} [put]
+// @Router /coffee/update/{slug} [put]
 func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idString := r.PathValue("id")
-		id, err := strconv.ParseUint(idString, 10, 32)
-		if err != nil {
-			http.Error(w, "invalid id", http.StatusBadRequest)
-			return
-		}
-
-		existingCoffee, err := handler.CoffeeRepository.GetById(uint(id))
+		slug := r.PathValue("slug")
+		existingCoffee, err := handler.CoffeeRepository.GetBySlug(slug)
 		if err != nil {
 			http.Error(w, "coffee not found", http.StatusBadRequest)
 			return
@@ -218,7 +218,7 @@ func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 			name = existingCoffee.Name
 		}
 
-		slug := r.FormValue("slug")
+		slug = r.FormValue("slug")
 		if slug == "" {
 			slug = existingCoffee.Slug
 		}
@@ -255,7 +255,6 @@ func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 		}
 
 		updatedCoffee, err := handler.CoffeeRepository.Update(&Coffee{
-			ID:          uint(id),
 			Name:        name,
 			Slug:        slug,
 			Price:       price,
@@ -280,19 +279,15 @@ func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 // @Tags Coffee
 // @Accept json
 // @Produce json
-// @Param id path int true "ID кофе"
+// @Param slug path string true "slug кофе"
 // @Success 200 {object} CoffeeGetResponse "кофе"
 // @Failure 400 {string} string "Неверные параметры"
-// @Router /coffee/coffee/{id} [get]
+// @Router /coffee/coffee/{slug} [get]
 func (handler *CoffeeHandler) GetCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idString := r.PathValue("id")
-		id, err := strconv.ParseUint(idString, 10, 32)
-		if err != nil {
-			http.Error(w, "invalid id", http.StatusBadRequest)
-			return
-		}
-		coffee, err := handler.CoffeeRepository.GetById(uint(id))
+		slug := r.PathValue("slug")
+
+		coffee, err := handler.CoffeeRepository.GetBySlug(slug)
 		if err != nil {
 			http.Error(w, "coffee not found", http.StatusNotFound)
 			return

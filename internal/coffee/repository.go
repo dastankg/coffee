@@ -2,7 +2,6 @@ package coffee
 
 import (
 	"coffee/pkg/db"
-	"gorm.io/gorm/clause"
 )
 
 type CoffeeRepository struct {
@@ -37,17 +36,17 @@ func (repo *CoffeeRepository) Count() int64 {
 	return count
 }
 
-func (repo *CoffeeRepository) Delete(id uint) error {
-	result := repo.Database.DB.Unscoped().Delete(&Coffee{}, id)
+func (repo *CoffeeRepository) Delete(slug string) error {
+	result := repo.Database.DB.Unscoped().Where("slug = ?", slug).Delete(&Coffee{})
 	if result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (repo *CoffeeRepository) GetById(id uint) (*Coffee, error) {
+func (repo *CoffeeRepository) GetBySlug(slug string) (*Coffee, error) {
 	var coffee Coffee
-	result := repo.Database.DB.First(&coffee, id)
+	result := repo.Database.DB.Where("slug = ?", slug).First(&coffee)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -55,7 +54,9 @@ func (repo *CoffeeRepository) GetById(id uint) (*Coffee, error) {
 }
 
 func (repo *CoffeeRepository) Update(coffee *Coffee) (*Coffee, error) {
-	result := repo.Database.DB.Clauses(clause.OnConflict{}).Updates(coffee)
+	result := repo.Database.DB.Model(&Coffee{}).
+		Where("slug = ?", coffee.Slug).
+		Updates(coffee)
 	if result.Error != nil {
 		return nil, result.Error
 	}
