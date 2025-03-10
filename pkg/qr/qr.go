@@ -27,6 +27,9 @@ func (code *SimpleQRCode) SaveToFile(imagePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("не удалось сгенерировать QR-код: %w", err)
 	}
+	if err := os.MkdirAll(imagePath, 0755); err != nil {
+		return "", fmt.Errorf("ошибка создания директории: %w", err)
+	}
 	img := qr.Image(code.Size)
 	filename := fmt.Sprintf("%s.jpg", uuid.New().String())
 	fullPath := filepath.Join(imagePath, filename)
