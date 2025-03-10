@@ -81,7 +81,7 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 			http.Error(w, "Ошибка в числовых значениях: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		qrCode := qr.SimpleQRCode{Content: "http://localhost:8081/coffee/coffee/" + r.FormValue("slug"), Size: 256}
+		qrCode := qr.SimpleQRCode{Content: "http://http://139.59.2.151:8081/coffee/coffee/" + r.FormValue("slug"), Size: 256}
 
 		qrImage, err := qrCode.SaveToFile(uploadDir + "/qr")
 		if err != nil {
