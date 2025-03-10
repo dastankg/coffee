@@ -7,7 +7,7 @@ import (
 
 // @title People-Base API documentation
 // @version 1.0.1
-// @host localhost:8081
+// @host 139.59.2.151:8081
 // @BasePath
 func main() {
 	app := app.App()

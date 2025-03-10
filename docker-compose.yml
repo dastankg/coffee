@@ -17,6 +17,7 @@ services:
       - coffee-images:/app/static/images
     env_file:
       - .env
+
   postgres:
     container_name: postgres_goland_coffee
     image: postgres:16-alpine
@@ -27,11 +28,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - pkg/data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     env_file:
       - .env
-
-
 
 volumes:
   postgres_data:
