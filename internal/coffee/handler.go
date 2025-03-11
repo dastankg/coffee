@@ -25,12 +25,12 @@ func NewCoffeeHandler(router *http.ServeMux, deps CoffeeHandlerDeps) {
 	handler := &CoffeeHandler{
 		CoffeeRepository: deps.CoffeeRepository,
 	}
-	router.Handle("POST /coffee/create", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
-	router.HandleFunc("GET /coffee/coffees", handler.GetAllCoffee())
-	router.HandleFunc("GET /coffee/coffee/{slug}", handler.GetCoffee())
-	router.HandleFunc("GET /coffee/static/images/{dir}/{filename}", handler.GetCoffeeImage())
-	router.Handle("POST /coffee/delete/{slug}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
-	router.Handle("PUT /coffee/update/{slug}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
+	router.Handle("POST /coffees", middleware.IsAuthed(handler.CreateCoffee(), deps.Config))
+	router.HandleFunc("GET /coffees", handler.GetAllCoffee())
+	router.HandleFunc("GET /coffees/{slug}", handler.GetCoffee())
+	router.HandleFunc("GET /coffees/static/images/{dir}/{filename}", handler.GetCoffeeImage())
+	router.Handle("DELETE /coffees/{slug}", middleware.IsAuthed(handler.DeleteCoffee(), deps.Config))
+	router.Handle("PUT /coffees/{slug}", middleware.IsAuthed(handler.UpdateCoffee(), deps.Config))
 }
 
 const (
@@ -56,7 +56,7 @@ const (
 // @Param flagIcon formData file true "Иконка флага страны происхождения"
 // @Success 201 {object} Coffee
 // @Failure 401 {string} string "Unauthorized"
-// @Router /coffee/create [post]
+// @Router /coffees [post]
 func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseMultipartForm(maxFileSize); err != nil {
@@ -118,7 +118,7 @@ func (handler *CoffeeHandler) CreateCoffee() http.HandlerFunc {
 // @Param offset query int true "Смещение от начала списка"
 // @Success 200 {object} CoffeeGetAllResponse "Список кофе и общее количество"
 // @Failure 400 {string} string "Неверные параметры пагинации"
-// @Router /coffee/coffees [get]
+// @Router /coffees [get]
 func (handler *CoffeeHandler) GetAllCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -154,7 +154,8 @@ func (handler *CoffeeHandler) GetAllCoffee() http.HandlerFunc {
 // @Success 200 {object} nil "Успешное удаление"
 // @Failure 400 {string} string "Неверный ID"
 // @Failure 401 {string} string "Unauthorized"
-// @Router /coffee/delete/{slug} [post]
+// @Router /coffees/{slug} [delete]
+// ]
 func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
@@ -198,7 +199,7 @@ func (handler *CoffeeHandler) DeleteCoffee() http.HandlerFunc {
 // @Success 200 {object} Coffee "Обновленная информация о кофе"
 // @Failure 400 {string} string "Ошибка в запросе или неверный ID"
 // @Failure 401 {string} string "Unauthorized"
-// @Router /coffee/update/{slug} [put]
+// @Router /coffees/{slug} [put]
 func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
@@ -282,7 +283,7 @@ func (handler *CoffeeHandler) UpdateCoffee() http.HandlerFunc {
 // @Param slug path string true "slug кофе"
 // @Success 200 {object} CoffeeGetResponse "кофе"
 // @Failure 400 {string} string "Неверные параметры"
-// @Router /coffee/coffee/{slug} [get]
+// @Router /coffees/{slug} [get]
 func (handler *CoffeeHandler) GetCoffee() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
