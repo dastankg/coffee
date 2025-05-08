@@ -19,5 +19,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db.AutoMigrate(&coffee.Coffee{}, &user.User{})
+	err = db.AutoMigrate(&coffee.Coffee{}, &user.User{})
+	if err != nil {
+		return
+	}
 }
