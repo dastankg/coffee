@@ -112,17 +112,14 @@ func (j *JWT) ParseRefreshToken(token string) (bool, *JWTData) {
 }
 
 func (j *JWT) RefreshTokens(refreshToken string, accessTTL, refreshTTL time.Duration) (*TokenPair, error) {
-	// Проверяем refresh token
 	valid, data := j.ParseRefreshToken(refreshToken)
 	if !valid || data == nil {
 		return nil, jwt.ErrSignatureInvalid
 	}
 
-	// Проверяем тип токена
 	if data.TokenType != RefreshToken {
 		return nil, jwt.ErrTokenInvalidClaims
 	}
 
-	// Создаем новую пару токенов
 	return j.CreateTokenPair(data.Email, accessTTL, refreshTTL)
 }
